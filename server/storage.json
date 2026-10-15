@@ -1,0 +1,183 @@
+{
+  "users": [
+    [
+      "demo-user-101",
+      {
+        "id": "demo-user-101",
+        "email": "demo@business.com",
+        "fullName": "Sarah Jenkins",
+        "mobileNumber": "+1 (555) 234-5678",
+        "isVerified": true,
+        "createdAt": "2026-09-12T18:20:43.198Z",
+        "passwordHash": "54410cd086afcbaf74f1fbb20eefcc0a:6973730f80bac61a2bf8f1e04fe8a980743c4d2554b28e235e2c8d5a02a49789e29d0a03d63441c96606f16cb4b8ceb2131fd3fbc9e5ef72ee4ecd8022502800"
+      }
+    ],
+    [
+      "usr_25908e14-d2dd-41cf-9454-5aed516228d0",
+      {
+        "id": "usr_25908e14-d2dd-41cf-9454-5aed516228d0",
+        "email": "help.ecomart01@gmail.com",
+        "fullName": "Jaydeb Jana",
+        "mobileNumber": "7872490719",
+        "passwordHash": "dec3dea488a252cac1e79f4074f9f0b4:5a2e3e8ad1f48510ea16e9dd07b5be6623935e57fc5b6ab00318035e9624bb0733161a7f76bac1b765917ebbb1a7f6bcaf09522ecbd7c34b8b7165096d05bb48",
+        "isVerified": true,
+        "createdAt": "2026-10-12T18:22:37.071Z"
+      }
+    ]
+  ],
+  "otps": [],
+  "businessSettings": [
+    [
+      "demo-user-101",
+      {
+        "id": "biz-demo-user-101",
+        "userId": "demo-user-101",
+        "businessName": "The Artisan Bakery & Cafe",
+        "category": "Bakery & Espresso Bar",
+        "placeId": "ChIJN1t_tDeuEmsRUsoyG83frY4",
+        "googleReviewUrl": "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
+        "productsAndServices": "Handcrafted sourdough breads, French pastries, seasonal pies, specialty espresso drinks, artisanal sandwiches, gluten-friendly treats.",
+        "customerExperience": "Cozy rustic ambiance, friendly baristas, freshly baked goods right out of the stone oven every morning, fast checkout, clean seating.",
+        "brandTone": "friendly",
+        "targetKeywords": [
+          "sourdough",
+          "pastries",
+          "fresh espresso",
+          "cozy atmosphere",
+          "best bakery"
+        ],
+        "customSlug": "artisan-bakery-co",
+        "languagePreferences": [
+          {
+            "code": "en",
+            "name": "English",
+            "percentage": 70
+          },
+          {
+            "code": "es",
+            "name": "Spanish",
+            "percentage": 20
+          },
+          {
+            "code": "fr",
+            "name": "French",
+            "percentage": 10
+          }
+        ],
+        "autoReplyEnabled": true,
+        "autoReplyMode": "approval",
+        "minStarRating": 4,
+        "responseDelayMinutes": 5,
+        "updatedAt": "2026-10-12T18:20:43.198Z"
+      }
+    ],
+    [
+      "usr_25908e14-d2dd-41cf-9454-5aed516228d0",
+      {
+        "id": "biz-usr_25908e14-d2dd-41cf-9454-5aed516228d0",
+        "userId": "usr_25908e14-d2dd-41cf-9454-5aed516228d0",
+        "businessName": "Arventa Ventures",
+        "category": "Digital marketing agency",
+        "placeId": "",
+        "googleReviewUrl": "https://g.page/r/CbOgJVgsB5vAEAE/review",
+        "productsAndServices": "",
+        "customerExperience": "",
+        "brandTone": "luxurious",
+        "targetKeywords": [],
+        "customSlug": "arventa-ventures",
+        "languagePreferences": [
+          {
+            "code": "en",
+            "name": "English",
+            "percentage": 100
+          }
+        ],
+        "autoReplyEnabled": false,
+        "minStarRating": 4,
+        "responseDelayMinutes": 5,
+        "updatedAt": "2026-10-12T19:56:21.307Z"
+      }
+    ]
+  ],
+  "googleAccounts": [
+    [
+      "demo-user-101",
+      {
+        "connected": true,
+        "accountId": "accounts/1094829104921",
+        "accountName": "Sarah Jenkins (Owner)",
+        "locationId": "locations/8827361920",
+        "locationName": "The Artisan Bakery & Cafe - Main Street",
+        "placeId": "ChIJN1t_tDeuEmsRUsoyG83frY4",
+        "address": "742 Evergreen Terrace, Springfield, OR",
+        "rating": 4.9,
+        "reviewCount": 142,
+        "connectedAt": "2026-09-28T18:20:43.198Z"
+      }
+    ],
+    [
+      "usr_25908e14-d2dd-41cf-9454-5aed516228d0",
+      {
+        "connected": true,
+        "accountId": "accounts/google_29a9274e",
+        "accountName": "Authorized Google Business Account",
+        "locationId": "locations/39096232",
+        "locationName": "Verified Google Business Storefront",
+        "placeId": "ChIJPlaceId_dc3ef721",
+        "address": "Verified Google Maps Business Location",
+        "rating": 4.9,
+        "reviewCount": 46,
+        "connectedAt": "2026-10-12T19:16:47.467Z"
+      }
+    ]
+  ],
+  "reviews": [
+    [
+      "demo-user-101",
+      [
+        {
+          "id": "rev-01",
+          "userId": "demo-user-101",
+          "authorName": "Michael Chang",
+          "authorPhoto": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=faces",
+          "starRating": 5,
+          "reviewText": "Hands down the best sourdough and almond croissants in town! The staff is always so welcoming and cheerful in the mornings. You have to try their vanilla bean latte.",
+          "reviewDate": "2026-10-10T18:20:43.198Z",
+          "replyText": "Thank you so much Michael! We are thrilled to hear you enjoyed our almond croissants and vanilla bean latte. The morning crew loves serving you and cannot wait to welcome you back!",
+          "replyStatus": "published",
+          "replyDate": "2026-10-11T18:20:43.198Z",
+          "autoReplied": true,
+          "aiGeneratedTone": "friendly"
+        },
+        {
+          "id": "rev-02",
+          "userId": "demo-user-101",
+          "authorName": "Elena Rostova",
+          "authorPhoto": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=faces",
+          "starRating": 5,
+          "reviewText": "Ordered a custom birthday tart for our family gathering. The presentation was stunning and the flavor was out of this world! Worth every penny.",
+          "reviewDate": "2026-10-08T18:20:43.198Z",
+          "replyText": "Dear Elena, we are so delighted our custom tart was part of your special family celebration! Crafting delicious moments is what keeps our passion burning. See you again soon!",
+          "replyStatus": "drafted",
+          "autoReplied": false,
+          "aiGeneratedTone": "friendly"
+        },
+        {
+          "id": "rev-03",
+          "userId": "demo-user-101",
+          "authorName": "David Miller",
+          "starRating": 4,
+          "reviewText": "Great coffee and delicious cinnamon rolls. The line was a bit long on Saturday morning, but the team handled the crowd quickly and efficiently.",
+          "reviewDate": "2026-10-06T18:20:43.199Z",
+          "replyText": "",
+          "replyStatus": "pending",
+          "autoReplied": false
+        }
+      ]
+    ],
+    [
+      "usr_25908e14-d2dd-41cf-9454-5aed516228d0",
+      []
+    ]
+  ]
+}

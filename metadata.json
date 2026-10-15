@@ -1,0 +1,6 @@
+{
+  "name": "ReputePulse - Google Business Profile Review Automation",
+  "description": "Customer portal for Google Business Profile review generation, AI reply automation, custom landing pages, and QR codes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
