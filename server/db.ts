@@ -68,7 +68,6 @@ class DatabaseStore {
   private reviews: Map<string, CustomerReview[]> = new Map();
 
   constructor() {
-    this.seedDemoCustomer();
     this.loadFromDisk();
   }
 
@@ -103,105 +102,6 @@ class DatabaseStore {
     }
   }
 
-  private seedDemoCustomer() {
-    const demoUserId = 'demo-user-101';
-    const demoEmail = 'demo@business.com';
-    const pwdHash = hashPassword('DemoPass123!');
-
-    this.users.set(demoUserId, {
-      id: demoUserId,
-      email: demoEmail,
-      fullName: 'Sarah Jenkins',
-      mobileNumber: '+1 (555) 234-5678',
-      isVerified: true,
-      createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
-      passwordHash: pwdHash,
-    });
-
-    const slug = 'artisan-bakery-co';
-    this.businessSettings.set(demoUserId, {
-      id: 'biz-' + demoUserId,
-      userId: demoUserId,
-      businessName: 'The Artisan Bakery & Cafe',
-      category: 'Bakery & Espresso Bar',
-      placeId: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
-      googleReviewUrl: 'https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4',
-      productsAndServices: 'Handcrafted sourdough breads, French pastries, seasonal pies, specialty espresso drinks, artisanal sandwiches, gluten-friendly treats.',
-      customerExperience: 'Cozy rustic ambiance, friendly baristas, freshly baked goods right out of the stone oven every morning, fast checkout, clean seating.',
-      brandTone: 'friendly',
-      targetKeywords: ['sourdough', 'pastries', 'fresh espresso', 'cozy atmosphere', 'best bakery'],
-      customSlug: slug,
-      languagePreferences: [
-        { code: 'en', name: 'English', percentage: 70 },
-        { code: 'es', name: 'Spanish', percentage: 20 },
-        { code: 'fr', name: 'French', percentage: 10 },
-      ],
-      autoReplyEnabled: true,
-      autoReplyMode: 'approval',
-      minStarRating: 4,
-      responseDelayMinutes: 5,
-      updatedAt: new Date().toISOString(),
-    });
-
-    this.googleAccounts.set(demoUserId, {
-      connected: true,
-      accountId: 'accounts/1094829104921',
-      accountName: 'Sarah Jenkins (Owner)',
-      locationId: 'locations/8827361920',
-      locationName: 'The Artisan Bakery & Cafe - Main Street',
-      placeId: 'ChIJN1t_tDeuEmsRUsoyG83frY4',
-      address: '742 Evergreen Terrace, Springfield, OR',
-      rating: 4.9,
-      reviewCount: 142,
-      connectedAt: new Date(Date.now() - 14 * 86400000).toISOString(),
-    });
-
-    const demoReviews: CustomerReview[] = [
-      {
-        id: 'rev-01',
-        userId: demoUserId,
-        authorName: 'Michael Chang',
-        authorPhoto: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=faces',
-        starRating: 5,
-        reviewText: 'Hands down the best sourdough and almond croissants in town! The staff is always so welcoming and cheerful in the mornings. You have to try their vanilla bean latte.',
-        reviewDate: new Date(Date.now() - 2 * 86400000).toISOString(),
-        replyText: 'Thank you so much Michael! We are thrilled to hear you enjoyed our almond croissants and vanilla bean latte. The morning crew loves serving you and cannot wait to welcome you back!',
-        replyStatus: 'published',
-        replyDate: new Date(Date.now() - 1 * 86400000).toISOString(),
-        autoReplied: true,
-        aiGeneratedTone: 'friendly',
-      },
-      {
-        id: 'rev-02',
-        userId: demoUserId,
-        authorName: 'Elena Rostova',
-        authorPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=faces',
-        starRating: 5,
-        reviewText: 'Ordered a custom birthday tart for our family gathering. The presentation was stunning and the flavor was out of this world! Worth every penny.',
-        reviewDate: new Date(Date.now() - 4 * 86400000).toISOString(),
-        replyText: 'Dear Elena, we are so delighted our custom tart was part of your special family celebration! Crafting delicious moments is what keeps our passion burning. See you again soon!',
-        replyStatus: 'drafted',
-        replyDate: undefined,
-        autoReplied: false,
-        aiGeneratedTone: 'friendly',
-      },
-      {
-        id: 'rev-03',
-        userId: demoUserId,
-        authorName: 'David Miller',
-        starRating: 4,
-        reviewText: 'Great coffee and delicious cinnamon rolls. The line was a bit long on Saturday morning, but the team handled the crowd quickly and efficiently.',
-        reviewDate: new Date(Date.now() - 6 * 86400000).toISOString(),
-        replyText: '',
-        replyStatus: 'pending',
-        replyDate: undefined,
-        autoReplied: false,
-      },
-    ];
-
-    this.reviews.set(demoUserId, demoReviews);
-  }
-
   // User management
   public findUserByEmail(email: string): UserRecord | undefined {
     const normalized = email.toLowerCase().trim();
@@ -220,6 +120,7 @@ class DatabaseStore {
   public createUser(userData: {
     email: string;
     fullName: string;
+    businessName?: string;
     mobileNumber: string;
     passwordHash: string;
     isVerified?: boolean;
@@ -236,12 +137,20 @@ class DatabaseStore {
     };
     this.users.set(id, newUser);
 
-    // Initialize blank business settings for new user
-    const slug = newUser.fullName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + id.slice(-4);
+    // Initialize business settings for new user with separate businessName
+    const chosenBusinessName = (userData.businessName || '').trim() || `${newUser.fullName}'s Business`;
+    const baseSlug = chosenBusinessName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    const slug = (baseSlug || 'store') + '-' + id.slice(-4);
+
     this.businessSettings.set(id, {
       id: 'biz-' + id,
       userId: id,
-      businessName: `${newUser.fullName}'s Business`,
+      businessName: chosenBusinessName,
+      businessLogo: '',
       category: 'Local Service & Retail',
       placeId: '',
       googleReviewUrl: '',
@@ -263,6 +172,23 @@ class DatabaseStore {
     this.saveToDisk();
 
     return newUser;
+  }
+
+  public updateUserProfile(
+    userId: string,
+    data: { fullName?: string; mobileNumber?: string }
+  ): UserRecord | undefined {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+    if (data.fullName && typeof data.fullName === 'string' && data.fullName.trim()) {
+      user.fullName = data.fullName.trim();
+    }
+    if (data.mobileNumber && typeof data.mobileNumber === 'string' && data.mobileNumber.trim()) {
+      user.mobileNumber = data.mobileNumber.trim();
+    }
+    this.users.set(userId, user);
+    this.saveToDisk();
+    return user;
   }
 
   public updateUserPassword(userId: string, newPasswordHash: string): boolean {

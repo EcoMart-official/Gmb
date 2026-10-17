@@ -18,6 +18,7 @@ interface PublicReviewPageProps {
 
 interface PublicBusinessData {
   businessName: string;
+  businessLogo?: string;
   category: string;
   customSlug: string;
   googleReviewUrl: string;
@@ -200,18 +201,27 @@ export function PublicReviewPage({ slug, onBackToDashboard }: PublicReviewPagePr
       <div className="max-w-md mx-auto w-full bg-white border border-[#dadce0] rounded-2xl p-6 sm:p-7 shadow-xs space-y-6">
         {/* Business Branding */}
         <div className="text-center space-y-1.5 pb-4 border-b border-[#dadce0]">
-          {/* Google Store Canopy Icon */}
-          <div className="w-12 h-12 rounded-xl bg-white border border-[#dadce0] shadow-2xs flex items-center justify-center mx-auto mb-2">
-            <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none">
-              <path d="M4 10V19C4 19.5523 4.44772 20 5 20H19C19.5523 20 20 19.5523 20 19V10" stroke="#1A73E8" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M2 7L4.5 4H19.5L22 7L20 10H4L2 7Z" fill="#1A73E8"/>
-              <path d="M7 10C7 11.1046 6.10457 12 5 12C3.89543 12 3 11.1046 3 10" stroke="#EA4335" strokeWidth="2"/>
-              <path d="M11 10C11 11.1046 10.1046 12 9 12C7.89543 12 7 11.1046 7 10" stroke="#FBBC04" strokeWidth="2"/>
-              <path d="M15 10C15 11.1046 14.1046 12 13 12C11.8954 12 11 11.1046 11 10" stroke="#34A853" strokeWidth="2"/>
-              <path d="M19 10C19 11.1046 18.1046 12 17 12C15.8954 12 15 11.1046 15 10" stroke="#1A73E8" strokeWidth="2"/>
-              <path d="M9 20V14H15V20" stroke="#1A73E8" strokeWidth="2"/>
-            </svg>
-          </div>
+          {business.businessLogo ? (
+            <div className="w-16 h-16 rounded-2xl bg-white border border-[#dadce0] shadow-2xs flex items-center justify-center mx-auto mb-2 overflow-hidden p-1">
+              <img
+                src={business.businessLogo}
+                alt={business.businessName}
+                className="w-full h-full object-contain"
+              />
+            </div>
+          ) : (
+            <div className="w-12 h-12 rounded-xl bg-white border border-[#dadce0] shadow-2xs flex items-center justify-center mx-auto mb-2">
+              <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none">
+                <path d="M4 10V19C4 19.5523 4.44772 20 5 20H19C19.5523 20 20 19.5523 20 19V10" stroke="#1A73E8" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M2 7L4.5 4H19.5L22 7L20 10H4L2 7Z" fill="#1A73E8"/>
+                <path d="M7 10C7 11.1046 6.10457 12 5 12C3.89543 12 3 11.1046 3 10" stroke="#EA4335" strokeWidth="2"/>
+                <path d="M11 10C11 11.1046 10.1046 12 9 12C7.89543 12 7 11.1046 7 10" stroke="#FBBC04" strokeWidth="2"/>
+                <path d="M15 10C15 11.1046 14.1046 12 13 12C11.8954 12 11 11.1046 11 10" stroke="#34A853" strokeWidth="2"/>
+                <path d="M19 10C19 11.1046 18.1046 12 17 12C15.8954 12 15 11.1046 15 10" stroke="#1A73E8" strokeWidth="2"/>
+                <path d="M9 20V14H15V20" stroke="#1A73E8" strokeWidth="2"/>
+              </svg>
+            </div>
+          )}
           <h1 className="text-lg font-bold text-[#202124] tracking-tight">
             {business.businessName}
           </h1>
@@ -293,10 +303,9 @@ export function PublicReviewPage({ slug, onBackToDashboard }: PublicReviewPagePr
             {(business.languagePreferences && business.languagePreferences.length > 0
               ? business.languagePreferences
               : [
-                  { code: 'en', name: 'English' },
-                  { code: 'es', name: 'Spanish' },
-                  { code: 'fr', name: 'French' },
-                  { code: 'de', name: 'German' },
+                  { code: 'en', name: 'English (India)' },
+                  { code: 'hi', name: 'Hindi (हिन्दी)' },
+                  { code: 'bn', name: 'Bengali (বাংলা)' },
                 ]
             ).map((lang) => (
               <option key={lang.code} value={lang.name}>
@@ -403,7 +412,7 @@ export function PublicReviewPage({ slug, onBackToDashboard }: PublicReviewPagePr
 
       {/* Footer Branding */}
       <div className="text-center text-[11px] text-[#5f6368] py-4">
-        Google Business Profile Review Assistant &bull; ReputePulse
+        Google Business Profile Review Assistant &bull; RANKORA
       </div>
     </div>
   );

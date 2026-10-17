@@ -1,18 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
-  Sliders,
+  Building2,
+  User,
+  Mail,
+  Phone,
+  Upload,
+  Image as ImageIcon,
+  Trash2,
+  Lock,
   Save,
   CheckCircle2,
-  Plus,
-  Trash2,
-  Sparkles,
   RefreshCw,
-  Globe,
-  Tag,
+  AlertCircle,
   ExternalLink,
+  ShieldCheck,
+  MapPin,
 } from 'lucide-react';
-import { BusinessSettings, LanguagePreference } from '../../types';
+import { BusinessSettings } from '../../types';
 import { api } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
 interface BusinessSettingsTabProps {
@@ -20,462 +26,414 @@ interface BusinessSettingsTabProps {
   onUpdateSettings: (newSettings: BusinessSettings) => void;
 }
 
-const AVAILABLE_LANGUAGES = [
-  { code: 'en', name: 'English' },
-  { code: 'es', name: 'Spanish' },
-  { code: 'fr', name: 'French' },
-  { code: 'de', name: 'German' },
-  { code: 'it', name: 'Italian' },
-  { code: 'pt', name: 'Portuguese' },
-  { code: 'nl', name: 'Dutch' },
-  { code: 'ja', name: 'Japanese' },
-];
+const MAX_LOGO_SIZE_BYTES = 5 * 1024 * 1024; // 5 Megabytes
 
 export function BusinessSettingsTab({
   settings,
   onUpdateSettings,
 }: BusinessSettingsTabProps) {
+  const { user, refreshUser } = useAuth();
   const { showSuccess, showError } = useToast();
+
   const [saving, setSaving] = useState(false);
 
-  // Form states
+  // 1. Business Identity
   const [businessName, setBusinessName] = useState(settings.businessName || '');
-  const [category, setCategory] = useState(settings.category || '');
-  const [placeId, setPlaceId] = useState(settings.placeId || '');
+  const [businessLogo, setBusinessLogo] = useState(settings.businessLogo || '');
+  const [logoFileName, setLogoFileName] = useState('');
+  const [logoFileSize, setLogoFileSize] = useState('');
+  const [logoError, setLogoError] = useState('');
+
+  // 2. Owner Details
+  const [ownerFullName, setOwnerFullName] = useState(user?.fullName || '');
+  const [mobileNumber, setMobileNumber] = useState(user?.mobileNumber || '');
+  const email = user?.email || '';
+
+  // 3. Google Maps Integration
   const [googleReviewUrl, setGoogleReviewUrl] = useState(settings.googleReviewUrl || '');
-  const [productsAndServices, setProductsAndServices] = useState(settings.productsAndServices || '');
-  const [customerExperience, setCustomerExperience] = useState(settings.customerExperience || '');
-  const [brandTone, setBrandTone] = useState<BusinessSettings['brandTone']>(settings.brandTone || 'friendly');
-  const [targetKeywords, setTargetKeywords] = useState<string[]>(settings.targetKeywords || []);
-  const [newKeyword, setNewKeyword] = useState('');
-  const [languages, setLanguages] = useState<LanguagePreference[]>(
-    settings.languagePreferences && settings.languagePreferences.length > 0
-      ? settings.languagePreferences
-      : [{ code: 'en', name: 'English', percentage: 100 }]
-  );
 
-  const handleAddKeyword = () => {
-    const trimmed = newKeyword.trim().toLowerCase();
-    if (trimmed && !targetKeywords.includes(trimmed)) {
-      setTargetKeywords([...targetKeywords, trimmed]);
-      setNewKeyword('');
-    }
-  };
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleRemoveKeyword = (keyword: string) => {
-    setTargetKeywords(targetKeywords.filter((k) => k !== keyword));
-  };
+  // Handle Logo File Selection with 5MB validation
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const handleLanguagePercentageChange = (code: string, newPercentage: number) => {
-    setLanguages((prev) =>
-      prev.map((l) => (l.code === code ? { ...l, percentage: Math.max(0, Math.min(100, newPercentage)) } : l))
-    );
-  };
+    setLogoError('');
 
-  const handleAddLanguage = (code: string) => {
-    const found = AVAILABLE_LANGUAGES.find((l) => l.code === code);
-    if (found && !languages.some((l) => l.code === code)) {
-      setLanguages([...languages, { code: found.code, name: found.name, percentage: 0 }]);
-    }
-  };
-
-  const handleRemoveLanguage = (code: string) => {
-    if (languages.length <= 1) {
-      showError('At least one primary language must remain configured.');
+    if (!file.type.startsWith('image/')) {
+      setLogoError('Invalid file type. Please upload an image file (PNG, JPG, WebP, SVG).');
       return;
     }
-    setLanguages(languages.filter((l) => l.code !== code));
+
+    if (file.size > MAX_LOGO_SIZE_BYTES) {
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+      setLogoError(`The selected file is ${sizeMb} MB, which exceeds the 5 MB limit. Please select an image under 5 MB.`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setBusinessLogo(result);
+      setLogoFileName(file.name);
+      setLogoFileSize((file.size / (1024 * 1024)).toFixed(2) + ' MB');
+      showSuccess(`Logo loaded (${(file.size / (1024 * 1024)).toFixed(2)} MB). Click "Save Changes" below to apply.`);
+    };
+    reader.onerror = () => {
+      setLogoError('Failed to read the image file.');
+    };
+    reader.readAsDataURL(file);
   };
 
-  const totalPercentage = languages.reduce((acc, l) => acc + (Number(l.percentage) || 0), 0);
-  const isPercentageValid = totalPercentage === 100;
-
-  const handleAutoBalanceLanguages = () => {
-    if (languages.length === 0) return;
-    const base = Math.floor(100 / languages.length);
-    const remainder = 100 - base * languages.length;
-    setLanguages(
-      languages.map((l, index) => ({
-        ...l,
-        percentage: index === 0 ? base + remainder : base,
-      }))
-    );
-  };
-
-  const handlePlaceIdChange = (newPlaceId: string) => {
-    setPlaceId(newPlaceId);
-    if (!googleReviewUrl || googleReviewUrl.includes('search.google.com/local/writereview?placeid=')) {
-      setGoogleReviewUrl(
-        newPlaceId.trim()
-          ? `https://search.google.com/local/writereview?placeid=${newPlaceId.trim()}`
-          : ''
-      );
+  const handleRemoveLogo = () => {
+    setBusinessLogo('');
+    setLogoFileName('');
+    setLogoFileSize('');
+    setLogoError('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLogoError('');
 
     if (!businessName.trim()) {
-      showError('Business name cannot be empty.');
+      showError('Please enter a business name.');
       return;
     }
 
-    if (!isPercentageValid) {
-      showError(`Total language distribution must equal 100% (currently ${totalPercentage}%).`);
+    if (!ownerFullName.trim()) {
+      showError('Please enter owner full name.');
+      return;
+    }
+
+    if (!mobileNumber.trim()) {
+      showError('Please enter mobile number.');
       return;
     }
 
     setSaving(true);
     try {
       const res = await api.updateBusinessSettings({
-        businessName,
-        category,
-        placeId,
-        googleReviewUrl,
-        productsAndServices,
-        customerExperience,
-        brandTone,
-        targetKeywords,
-        languagePreferences: languages,
+        businessName: businessName.trim(),
+        businessLogo: businessLogo || undefined,
+        fullName: ownerFullName.trim(),
+        mobileNumber: mobileNumber.trim(),
+        googleReviewUrl: googleReviewUrl.trim(),
       });
 
       if (res.error) {
         showError(res.error);
       } else {
-        showSuccess('Business profile settings saved.');
-        onUpdateSettings(res.settings);
+        showSuccess('Business profile updated successfully!');
+        if (res.settings) {
+          onUpdateSettings(res.settings);
+        }
+        await refreshUser();
       }
     } catch {
-      showError('Failed to save business settings.');
+      showError('Failed to save business settings. Please check your network connection.');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Top Banner with Save Action */}
-      <div className="bg-white border border-[#dadce0] rounded-xl p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto pb-12">
+      {/* SECTION 1: BUSINESS IDENTITY (Logo & Business Name) */}
+      <div className="bg-white border border-[#dadce0] rounded-xl p-5 sm:p-7 shadow-xs space-y-6">
+        <div className="border-b border-[#dadce0] pb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-[#e8f0fe] text-[#1a73e8] flex items-center justify-center shrink-0 shadow-2xs">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-bold text-sm sm:text-base text-[#202124] tracking-tight">
+                Business Identity
+              </h3>
+              <p className="text-xs text-[#5f6368] truncate">
+                Brand name and store logo for review stands and customer landing pages.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Business Logo Upload Section */}
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <div>
+              <label className="block text-xs font-bold text-[#202124]">
+                Business Logo
+              </label>
+              <p className="text-[11px] text-[#5f6368]">
+                Displayed on your QR stand templates, table tent cards, and customer review landing page.
+              </p>
+            </div>
+            <span className="self-start sm:self-auto inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#e8f0fe] text-[#1a73e8] border border-[#d2e3fc]">
+              Max 5MB &bull; PNG, JPG, SVG
+            </span>
+          </div>
+
+          <div className="p-4 sm:p-5 bg-[#f8f9fa] border border-[#dadce0] rounded-xl flex flex-col sm:flex-row items-center sm:items-start gap-5">
+            {/* Logo Preview Square */}
+            <div className="relative w-28 h-28 rounded-xl border-2 border-dashed border-[#dadce0] bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-2xs group">
+              {businessLogo ? (
+                <>
+                  <img
+                    src={businessLogo}
+                    alt={businessName || 'Business Logo'}
+                    className="w-full h-full object-contain p-2"
+                  />
+                  <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#137333] text-white shadow-2xs">
+                    Active
+                  </span>
+                </>
+              ) : (
+                <div className="text-center p-3">
+                  <div className="w-10 h-10 rounded-full bg-[#f1f3f4] flex items-center justify-center mx-auto mb-1 text-[#5f6368]">
+                    <ImageIcon className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-medium text-[#5f6368] block leading-tight">
+                    No Logo Uploaded
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Logo Upload & Management Actions */}
+            <div className="flex-1 w-full space-y-3 text-center sm:text-left">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                onChange={handleLogoFileChange}
+                className="hidden"
+                id="business-logo-input"
+              />
+
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+                <label
+                  htmlFor="business-logo-input"
+                  className="px-4 py-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white font-medium text-xs rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{businessLogo ? 'Change Logo' : 'Upload Business Logo'}</span>
+                </label>
+
+                {businessLogo && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    className="px-3.5 py-2 bg-white hover:bg-[#fce8e6] border border-[#dadce0] hover:border-[#f5c2c7] text-[#c5221f] text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Remove</span>
+                  </button>
+                )}
+              </div>
+
+              {logoFileName ? (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#e6f4ea] border border-[#ceead6] text-[11px] font-medium text-[#137333]">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#1e8e3e]" />
+                  <span>{logoFileName} {logoFileSize && `(${logoFileSize})`}</span>
+                </div>
+              ) : (
+                <p className="text-[11px] text-[#5f6368] leading-relaxed">
+                  Recommended: Transparent PNG or high-contrast JPG, square aspect ratio (500x500px). Maximum file size is strictly 5MB.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {logoError && (
+            <div className="p-3 bg-[#fce8e6] border border-[#f5c2c7] rounded-lg text-xs text-[#c5221f] flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{logoError}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Business Name Field */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold text-[#202124]">
+            Business Name *
+          </label>
+          <div className="relative">
+            <Building2 className="w-4 h-4 text-[#5f6368] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              required
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              placeholder="e.g., Arventa Ventures / EcoMart Official"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#dadce0] rounded-lg text-sm font-semibold text-[#202124] focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] shadow-2xs"
+            />
+          </div>
+          <p className="text-[11px] text-[#5f6368]">
+            This name represents your company, store, or agency independently from the owner's personal name.
+          </p>
+        </div>
+      </div>
+
+      {/* SECTION 2: OWNER ACCOUNT DETAILS */}
+      <div className="bg-white border border-[#dadce0] rounded-xl p-5 sm:p-7 shadow-xs space-y-5">
+        <div className="border-b border-[#dadce0] pb-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#e8f0fe] text-[#1a73e8] flex items-center justify-center shrink-0 shadow-2xs">
+            <User className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-sm sm:text-base text-[#202124] tracking-tight">
+              Owner Account Information
+            </h3>
+            <p className="text-xs text-[#5f6368]">
+              Account credentials provided during registration. Email is permanent for security.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Owner Full Name */}
+          <div>
+            <label className="block text-xs font-semibold text-[#5f6368] mb-1.5">
+              Owner Full Name *
+            </label>
+            <div className="relative">
+              <User className="w-4 h-4 text-[#5f6368] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                required
+                value={ownerFullName}
+                onChange={(e) => setOwnerFullName(e.target.value)}
+                placeholder="e.g., Jaydeb Jana"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#dadce0] rounded-lg text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] shadow-2xs"
+              />
+            </div>
+            <p className="text-[11px] text-[#5f6368] mt-1">
+              Personal name of the business owner or primary administrator.
+            </p>
+          </div>
+
+          {/* Mobile Number */}
+          <div>
+            <label className="block text-xs font-semibold text-[#5f6368] mb-1.5">
+              Mobile Number *
+            </label>
+            <div className="relative">
+              <Phone className="w-4 h-4 text-[#5f6368] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="tel"
+                required
+                value={mobileNumber}
+                onChange={(e) => setMobileNumber(e.target.value)}
+                placeholder="e.g., +91 8001608004"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#dadce0] rounded-lg text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] shadow-2xs"
+              />
+            </div>
+            <p className="text-[11px] text-[#5f6368] mt-1">
+              Registered contact phone number for administrative alerts.
+            </p>
+          </div>
+        </div>
+
+        {/* Registered Email (Strictly Non-Editable / Locked) */}
         <div>
-          <h2 className="text-lg font-bold text-[#202124]">
-            Business Profile & Review Link Setup
-          </h2>
-          <p className="text-xs sm:text-sm text-[#5f6368] mt-0.5">
-            Configure your business details and Google Review submission URL. When customers scan your QR stand, they will be directed to this review link.
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-semibold text-[#5f6368] flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-[#5f6368]" />
+              <span>Registered Email Address</span>
+            </label>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#137333] bg-[#e6f4ea] px-2.5 py-0.5 rounded-full border border-[#ceead6]">
+              <Lock className="w-3 h-3 text-[#1e8e3e]" />
+              <span>Non-Editable (Verified)</span>
+            </span>
+          </div>
+
+          <div className="relative">
+            <input
+              type="email"
+              disabled
+              value={email}
+              className="w-full pl-10 pr-10 py-2.5 bg-[#f1f3f4] border border-[#dadce0] rounded-lg text-sm font-medium text-[#5f6368] cursor-not-allowed select-all shadow-2xs"
+            />
+            <Mail className="w-4 h-4 text-[#5f6368] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Lock className="w-4 h-4 text-[#9aa0a6] absolute right-3.5 top-1/2 -translate-y-1/2" />
+          </div>
+
+          <p className="text-[11px] text-[#5f6368] mt-1.5 flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#137333]" />
+            <span>Email is locked to maintain verified cryptographic session and account security integrity.</span>
+          </p>
+        </div>
+      </div>
+
+      {/* SECTION 3: GOOGLE MAPS REVIEW LINK */}
+      <div className="bg-white border border-[#dadce0] rounded-xl p-5 sm:p-7 shadow-xs space-y-4">
+        <div className="border-b border-[#dadce0] pb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#e8f0fe] text-[#1a73e8] flex items-center justify-center shrink-0 shadow-2xs">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm sm:text-base text-[#202124] tracking-tight">
+                Google Maps Review Link
+              </h3>
+              <p className="text-xs text-[#5f6368]">
+                Where customers land to post their reviews directly onto Google Maps.
+              </p>
+            </div>
+          </div>
+          {googleReviewUrl && (
+            <a
+              href={googleReviewUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-semibold text-[#1a73e8] hover:underline inline-flex items-center gap-1 cursor-pointer shrink-0"
+            >
+              <span>Test Link</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-[#5f6368] mb-1.5">
+            Google Review Submission URL
+          </label>
+          <input
+            type="url"
+            value={googleReviewUrl}
+            onChange={(e) => setGoogleReviewUrl(e.target.value)}
+            placeholder="https://search.google.com/local/writereview?placeid=..."
+            className="w-full px-3.5 py-2.5 bg-white border border-[#dadce0] rounded-lg text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] shadow-2xs"
+          />
+          <p className="text-[11px] text-[#5f6368] mt-1">
+            Enter your Google Business Profile review link or Google Maps write-review URL.
+          </p>
+        </div>
+      </div>
+
+      {/* SECTION 4: SAVE CHANGES ACTION */}
+      <div className="bg-white border border-[#dadce0] rounded-xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div>
+          <h4 className="text-sm font-bold text-[#202124]">
+            Save Your Business Profile Updates
+          </h4>
+          <p className="text-xs text-[#5f6368] mt-0.5">
+            Updates will instantly reflect across your customer review portal, QR stands, and account header.
           </p>
         </div>
 
         <button
           type="submit"
           disabled={saving}
-          className="px-5 py-2.5 bg-[#1a73e8] hover:bg-[#1557b0] disabled:opacity-50 text-white font-medium rounded-md text-sm shadow-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shrink-0"
+          className="w-full sm:w-auto px-7 py-3 bg-[#1a73e8] hover:bg-[#1557b0] disabled:opacity-50 text-white font-medium rounded-lg text-sm shadow-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shrink-0"
         >
           {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           <span>Save Changes</span>
         </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column: Business Profile */}
-        <div className="bg-white border border-[#dadce0] rounded-xl p-6 shadow-xs space-y-4">
-          <h3 className="font-bold text-sm text-[#202124] border-b border-[#dadce0] pb-3">
-            Core Business & Google Review Link
-          </h3>
-
-          <div>
-            <label className="block text-xs font-semibold text-[#5f6368] mb-1.5">
-              Official Business Name *
-            </label>
-            <input
-              type="text"
-              required
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
-              placeholder="e.g., The Artisan Bakery & Cafe"
-              className="w-full px-3.5 py-2.5 bg-white border border-[#dadce0] rounded-md text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[#5f6368] mb-1.5">
-              Business Category
-            </label>
-            <input
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="e.g., Bakery & Cafe, Dental Clinic, Retail Store"
-              className="w-full px-3.5 py-2.5 bg-white border border-[#dadce0] rounded-md text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[#5f6368] mb-1.5">
-              Google Place ID
-            </label>
-            <input
-              type="text"
-              value={placeId}
-              onChange={(e) => handlePlaceIdChange(e.target.value)}
-              placeholder="e.g., ChIJN1t_tDeuEmsRUsoyG83frY4"
-              className="w-full px-3.5 py-2.5 bg-white border border-[#dadce0] rounded-md text-sm font-mono text-[#202124] focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]"
-            />
-            <p className="text-[11px] text-[#5f6368] mt-1">
-              Entering your Place ID automatically generates your Google Review Submission URL below.
-            </p>
-          </div>
-
-          <div className="p-3.5 bg-[#f8f9fa] border border-[#d2e3fc] rounded-lg space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-[#1a73e8]">
-                Google Review Submission URL *
-              </label>
-              {googleReviewUrl && (
-                <a
-                  href={googleReviewUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[11px] text-[#1a73e8] hover:underline font-semibold inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Test Link</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              )}
-            </div>
-            <input
-              type="url"
-              required
-              value={googleReviewUrl}
-              onChange={(e) => setGoogleReviewUrl(e.target.value)}
-              placeholder="https://search.google.com/local/writereview?placeid=..."
-              className="w-full px-3.5 py-2.5 bg-white border border-[#dadce0] rounded-md text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]"
-            />
-            <p className="text-[11px] text-[#5f6368]">
-              Your QR code and landing page direct customers straight to this link to leave their Google review.
-            </p>
-          </div>
-
-          {/* Brand Tone Selector */}
-          <div>
-            <label className="block text-xs font-semibold text-[#5f6368] mb-1.5">
-              Brand Voice & AI Tone
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {[
-                { id: 'friendly', label: 'Friendly & Warm' },
-                { id: 'professional', label: 'Professional & Polished' },
-                { id: 'enthusiastic', label: 'Enthusiastic & Vibrant' },
-                { id: 'humble', label: 'Humble & Sincere' },
-                { id: 'luxurious', label: 'Luxurious & Refined' },
-              ].map((tone) => (
-                <button
-                  type="button"
-                  key={tone.id}
-                  onClick={() => setBrandTone(tone.id as BusinessSettings['brandTone'])}
-                  className={`p-2 rounded-md border text-xs font-medium text-center transition-colors cursor-pointer ${
-                    brandTone === tone.id
-                      ? 'bg-[#e8f0fe] border-[#1a73e8] text-[#1a73e8] font-semibold'
-                      : 'border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
-                  }`}
-                >
-                  {tone.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: AI Context */}
-        <div className="bg-white border border-[#dadce0] rounded-xl p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-[#dadce0] pb-3">
-            <h3 className="font-bold text-sm text-[#202124]">
-              AI Context & Products
-            </h3>
-            <span className="inline-flex items-center gap-1 text-[11px] text-[#1a73e8] font-medium">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Fed into Gemini 3.8 Flash</span>
-            </span>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[#5f6368] mb-1.5">
-              Products, Services & Offerings
-            </label>
-            <textarea
-              rows={3}
-              value={productsAndServices}
-              onChange={(e) => setProductsAndServices(e.target.value)}
-              placeholder="e.g., Sourdough loaves, French croissants, organic espresso, seasonal fruit tarts..."
-              className="w-full px-3.5 py-2.5 bg-white border border-[#dadce0] rounded-md text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]"
-            />
-            <p className="text-[11px] text-[#5f6368] mt-1">
-              List popular offerings so customer review drafts sound specific and authentic.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-[#5f6368] mb-1.5">
-              Customer Experience & Atmosphere
-            </label>
-            <textarea
-              rows={3}
-              value={customerExperience}
-              onChange={(e) => setCustomerExperience(e.target.value)}
-              placeholder="e.g., Cozy seating, warm morning bakery aroma, fast checkout, welcoming baristas, clean facilities..."
-              className="w-full px-3.5 py-2.5 bg-white border border-[#dadce0] rounded-md text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]"
-            />
-            <p className="text-[11px] text-[#5f6368] mt-1">
-              Mention atmosphere, staff friendliness, cleanliness, or location perks.
-            </p>
-          </div>
-
-          {/* Keywords */}
-          <div>
-            <label className="block text-xs font-semibold text-[#5f6368] mb-1.5">
-              Target SEO Keywords for Google Maps
-            </label>
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={newKeyword}
-                onChange={(e) => setNewKeyword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddKeyword();
-                  }
-                }}
-                placeholder="Add keyword (e.g. sourdough, best espresso)"
-                className="flex-1 px-3 py-2 bg-white border border-[#dadce0] rounded-md text-xs text-[#202124] focus:outline-none focus:border-[#1a73e8]"
-              />
-              <button
-                type="button"
-                onClick={handleAddKeyword}
-                className="px-3.5 py-2 bg-[#f1f3f4] hover:bg-[#e8eaed] text-[#3c4043] rounded-md text-xs font-medium flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add</span>
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {targetKeywords.map((kw) => (
-                <span
-                  key={kw}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[#e8f0fe] text-[#1a73e8] border border-[#d2e3fc]"
-                >
-                  <Tag className="w-3 h-3" />
-                  <span>{kw}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveKeyword(kw)}
-                    className="hover:text-[#c5221f] transition-colors"
-                  >
-                    ✕
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Multilingual Review Distribution Card */}
-      <div className="bg-white border border-[#dadce0] rounded-xl p-6 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#dadce0] pb-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <Globe className="w-4 h-4 text-[#1a73e8]" />
-              <h3 className="font-bold text-sm text-[#202124]">
-                Multilingual Review Language Distribution
-              </h3>
-            </div>
-            <p className="text-xs text-[#5f6368] mt-0.5">
-              Configure supported languages for reviews. The percentage sum must equal exactly 100%.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span
-              className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                isPercentageValid
-                  ? 'bg-[#e6f4ea] text-[#137333] border border-[#ceead6]'
-                  : 'bg-[#fce8e6] text-[#c5221f] border border-[#f5c2c7]'
-              }`}
-            >
-              Total: {totalPercentage}% {isPercentageValid ? '✓ Valid' : '✗ Must equal 100%'}
-            </span>
-
-            {!isPercentageValid && (
-              <button
-                type="button"
-                onClick={handleAutoBalanceLanguages}
-                className="text-xs text-[#1a73e8] hover:underline font-semibold cursor-pointer"
-              >
-                Auto-balance to 100%
-              </button>
-            )}
-
-            <select
-              onChange={(e) => {
-                if (e.target.value) {
-                  handleAddLanguage(e.target.value);
-                  e.target.value = '';
-                }
-              }}
-              defaultValue=""
-              className="px-3 py-1 text-xs font-medium bg-white border border-[#dadce0] rounded-md text-[#3c4043]"
-            >
-              <option value="" disabled>
-                + Add Language
-              </option>
-              {AVAILABLE_LANGUAGES.filter((al) => !languages.some((l) => l.code === al.code)).map((al) => (
-                <option key={al.code} value={al.code}>
-                  {al.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {languages.map((lang) => (
-            <div
-              key={lang.code}
-              className="p-3 bg-[#f8f9fa] border border-[#dadce0] rounded-lg flex items-center justify-between gap-3"
-            >
-              <div>
-                <span className="font-medium text-xs text-[#202124]">
-                  {lang.name}
-                </span>
-                <span className="text-[10px] text-[#5f6368] ml-1 font-mono uppercase">
-                  ({lang.code})
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={lang.percentage}
-                  onChange={(e) => handleLanguagePercentageChange(lang.code, parseInt(e.target.value, 10) || 0)}
-                  className="w-16 px-2 py-1 text-center font-bold text-xs bg-white border border-[#dadce0] rounded-md text-[#202124]"
-                />
-                <span className="text-xs font-medium text-[#5f6368]">%</span>
-                {languages.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveLanguage(lang.code)}
-                    className="text-[#5f6368] hover:text-[#c5221f] p-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </form>
   );

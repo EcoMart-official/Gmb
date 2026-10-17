@@ -15,7 +15,9 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CustomerUser | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('reputepulse_token'));
+  const [token, setToken] = useState<string | null>(
+    () => localStorage.getItem('rankora_token') || localStorage.getItem('reputepulse_token')
+  );
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const refreshUser = async () => {
@@ -29,11 +31,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.user) {
         setUser(data.user);
       } else {
+        localStorage.removeItem('rankora_token');
         localStorage.removeItem('reputepulse_token');
         setToken(null);
         setUser(null);
       }
     } catch {
+      localStorage.removeItem('rankora_token');
       localStorage.removeItem('reputepulse_token');
       setToken(null);
       setUser(null);
@@ -47,12 +51,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const login = (newToken: string, newUser: CustomerUser) => {
-    localStorage.setItem('reputepulse_token', newToken);
+    localStorage.setItem('rankora_token', newToken);
+    localStorage.removeItem('reputepulse_token');
     setToken(newToken);
     setUser(newUser);
   };
 
   const logout = () => {
+    localStorage.removeItem('rankora_token');
     localStorage.removeItem('reputepulse_token');
     setToken(null);
     setUser(null);

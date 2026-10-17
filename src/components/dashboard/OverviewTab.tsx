@@ -64,7 +64,7 @@ export function OverviewTab({
                 className="px-4 py-2.5 bg-[#1a73e8] hover:bg-[#1557b0] text-white font-medium rounded-md text-xs sm:text-sm shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
               >
                 <Share2 className="w-4 h-4" />
-                <span>Test Review Landing Page</span>
+                <span>Open Review Landing Page</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </button>
               <button
@@ -258,11 +258,11 @@ export function OverviewTab({
                   <ExternalLink className="w-5 h-5" />
                 </div>
                 <span className="text-[11px] font-medium text-[#1a73e8] bg-[#e8f0fe] px-2 py-0.5 rounded-full border border-[#d2e3fc]">
-                  Live Test
+                  Live Page
                 </span>
               </div>
               <h3 className="text-sm font-semibold text-[#202124] group-hover:text-[#1a73e8]">
-                Test Customer Experience
+                Customer Review Experience
               </h3>
               <p className="text-xs text-[#5f6368] mt-1">
                 Preview the interactive 5-star review draft page that your customers see.
@@ -303,7 +303,7 @@ export function OverviewTab({
           </div>
 
           <div className="mt-5 pt-4 border-t border-[#dadce0] text-[11px] text-[#5f6368] flex items-center justify-between">
-            <span>ReputePulse SaaS</span>
+            <span>RANKORA SaaS</span>
             <span className="text-[#137333] font-semibold">Active & Operational</span>
           </div>
         </div>

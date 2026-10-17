@@ -30,10 +30,13 @@ export interface BusinessSettings {
   id: string;
   userId: string;
   businessName: string;
+  businessLogo?: string;
   category: string;
   placeId: string;
   googleReviewUrl: string;
   productsAndServices: string;
+  services?: string[];
+  shopAiDetails?: string;
   customerExperience: string;
   brandTone: 'friendly' | 'professional' | 'enthusiastic' | 'humble' | 'luxurious';
   targetKeywords: string[];
@@ -43,6 +46,9 @@ export interface BusinessSettings {
   autoReplyMode: 'automatic' | 'approval';
   minStarRating: number;
   responseDelayMinutes: number;
+  geminiApiKey?: string;
+  reviewWritingRules?: string;
+  reviewStyleAndRules?: string;
   updatedAt: string;
 }
 
@@ -70,6 +76,7 @@ export interface OtpRecord {
   verified: boolean;
   pendingUserData?: {
     fullName: string;
+    businessName?: string;
     mobileNumber: string;
     passwordHash: string;
   };

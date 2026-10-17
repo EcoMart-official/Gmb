@@ -3,6 +3,7 @@ import {
   Lock,
   Mail,
   User,
+  Building2,
   Phone,
   Eye,
   EyeOff,
@@ -10,7 +11,7 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle2,
-  Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -29,6 +30,7 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
   const { showSuccess, showError } = useToast();
 
   const [fullName, setFullName] = useState('');
+  const [businessName, setBusinessName] = useState('');
   const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [password, setPassword] = useState('');
@@ -40,7 +42,6 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
   const [otpPurpose, setOtpPurpose] = useState<'registration' | 'password_reset'>('registration');
   const [cooldown, setCooldown] = useState(60);
   const [canResend, setCanResend] = useState(false);
-  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -69,17 +70,21 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
     return () => clearInterval(timer);
   }, [mode, cooldown]);
 
-  const handleQuickDemoFill = () => {
-    setEmail('demo@business.com');
-    setPassword('DemoPass123!');
-    setErrorMessage('');
-  };
-
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
-    if (!fullName || !email || !mobileNumber || !password || !confirmPassword) {
+    if (!fullName.trim()) {
+      setErrorMessage('Please enter the owner full name.');
+      return;
+    }
+
+    if (!businessName.trim()) {
+      setErrorMessage('Please enter the business name.');
+      return;
+    }
+
+    if (!email.trim() || !mobileNumber.trim() || !password || !confirmPassword) {
       setErrorMessage('Please fill in all required fields.');
       return;
     }
@@ -97,9 +102,10 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
     setLoading(true);
     try {
       const res = await api.register({
-        fullName,
-        email,
-        mobileNumber,
+        fullName: fullName.trim(),
+        businessName: businessName.trim(),
+        email: email.trim().toLowerCase(),
+        mobileNumber: mobileNumber.trim(),
         password,
         confirmPassword,
       });
@@ -108,9 +114,6 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
         setErrorMessage(res.error);
       } else {
         showSuccess(res.message || 'Verification code sent to your email.');
-        if (res.debugOtp) {
-          setDevOtpHint(res.debugOtp);
-        }
         setOtpPurpose('registration');
         setCooldown(60);
         setMode('otp_verify');
@@ -193,10 +196,7 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
       if (res.error) {
         setErrorMessage(res.error);
       } else {
-        showSuccess('A fresh verification code has been dispatched.');
-        if (res.debugOtp) {
-          setDevOtpHint(res.debugOtp);
-        }
+        showSuccess('A fresh verification code has been dispatched to your email.');
         setCooldown(60);
         setCanResend(false);
       }
@@ -220,9 +220,6 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
     try {
       const res = await api.forgotPassword(email);
       showSuccess(res.message);
-      if (res.debugOtp) {
-        setDevOtpHint(res.debugOtp);
-      }
       setOtpPurpose('password_reset');
       setCooldown(60);
       setMode('otp_verify');
@@ -317,23 +314,6 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
         </div>
       )}
 
-      {/* Dev OTP Helper */}
-      {devOtpHint && mode === 'otp_verify' && (
-        <div className="mb-4 p-2.5 bg-[#e8f0fe] border border-[#d2e3fc] rounded-lg text-[#1a73e8] text-xs flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#1a73e8]" />
-            <span>Dev code hint: <strong className="font-mono text-sm tracking-wider">{devOtpHint}</strong></span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setOtpCode(devOtpHint)}
-            className="text-[#1a73e8] font-semibold underline hover:text-[#1557b0]"
-          >
-            Auto-fill
-          </button>
-        </div>
-      )}
-
       {/* ---------------- LOGIN FORM ---------------- */}
       {mode === 'login' && (
         <form onSubmit={handleLogin} className="space-y-4">
@@ -401,13 +381,6 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
               />
               Stay signed in
             </label>
-            <button
-              type="button"
-              onClick={handleQuickDemoFill}
-              className="text-xs text-[#1a73e8] hover:underline"
-            >
-              Demo credentials
-            </button>
           </div>
 
           <button
@@ -444,9 +417,10 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
       {/* ---------------- REGISTER FORM ---------------- */}
       {mode === 'register' && (
         <form onSubmit={handleRegister} className="space-y-3">
+          {/* Owner Full Name */}
           <div>
             <label className="block text-xs font-semibold text-[#5f6368] mb-1">
-              Full name
+              Owner full name *
             </label>
             <div className="relative">
               <User className="w-4 h-4 text-[#5f6368] absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -455,15 +429,34 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Sarah Jenkins"
+                placeholder="e.g., Jaydeb Jana"
                 className="w-full pl-10 pr-4 py-2 bg-white border border-[#dadce0] rounded-md text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8]"
               />
             </div>
           </div>
 
+          {/* Business Name */}
           <div>
             <label className="block text-xs font-semibold text-[#5f6368] mb-1">
-              Email address
+              Business name *
+            </label>
+            <div className="relative">
+              <Building2 className="w-4 h-4 text-[#5f6368] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                required
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                placeholder="e.g., EcoMart Official / Arventa Ventures"
+                className="w-full pl-10 pr-4 py-2 bg-white border border-[#dadce0] rounded-md text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8]"
+              />
+            </div>
+          </div>
+
+          {/* Email Address */}
+          <div>
+            <label className="block text-xs font-semibold text-[#5f6368] mb-1">
+              Email address *
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-[#5f6368] absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -472,15 +465,16 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="sarah@business.com"
+                placeholder="you@company.com"
                 className="w-full pl-10 pr-4 py-2 bg-white border border-[#dadce0] rounded-md text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8]"
               />
             </div>
           </div>
 
+          {/* Mobile Number */}
           <div>
             <label className="block text-xs font-semibold text-[#5f6368] mb-1">
-              Mobile number
+              Mobile number *
             </label>
             <div className="relative">
               <Phone className="w-4 h-4 text-[#5f6368] absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -489,15 +483,16 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
                 required
                 value={mobileNumber}
                 onChange={(e) => setMobileNumber(e.target.value)}
-                placeholder="+1 (555) 234-5678"
+                placeholder="+91 8001608004"
                 className="w-full pl-10 pr-4 py-2 bg-white border border-[#dadce0] rounded-md text-sm text-[#202124] focus:outline-none focus:border-[#1a73e8]"
               />
             </div>
           </div>
 
+          {/* Password */}
           <div>
             <label className="block text-xs font-semibold text-[#5f6368] mb-1">
-              Password
+              Password *
             </label>
             <div className="relative">
               <Lock className="w-4 h-4 text-[#5f6368] absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -519,9 +514,10 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
             </div>
           </div>
 
+          {/* Confirm Password */}
           <div>
             <label className="block text-xs font-semibold text-[#5f6368] mb-1">
-              Confirm password
+              Confirm password *
             </label>
             <div className="relative">
               <Lock className="w-4 h-4 text-[#5f6368] absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -573,35 +569,19 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
       {/* ---------------- OTP VERIFICATION FORM ---------------- */}
       {mode === 'otp_verify' && (
         <form onSubmit={handleVerifyOtp} className="space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold text-[#5f6368]">
-                Enter 6-digit verification code
-              </label>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    if (navigator.clipboard && navigator.clipboard.readText) {
-                      const text = await navigator.clipboard.readText();
-                      const cleaned = text.replace(/\D/g, '').slice(0, 6);
-                      if (cleaned) {
-                        setOtpCode(cleaned);
-                        setErrorMessage('');
-                      }
-                    }
-                  } catch {
-                    // Clipboard permission rejected
-                  }
-                }}
-                className="text-xs text-[#1a73e8] font-medium hover:underline flex items-center gap-1"
-              >
-                <span>Paste from clipboard</span>
-              </button>
+          <div className="p-3 bg-[#e8f0fe] border border-[#d2e3fc] rounded-xl text-xs text-[#1a73e8] flex items-start gap-2.5">
+            <Mail className="w-4 h-4 shrink-0 mt-0.5 text-[#1a73e8]" />
+            <div className="leading-relaxed">
+              A 6-digit verification code has been dispatched to <strong>{email}</strong> via Gmail. Please check your inbox and spam folder.
             </div>
+          </div>
 
-            {/* Visual 6-digit boxes display */}
-            <div className="relative">
+          <div>
+            <label className="block text-xs font-semibold text-[#5f6368] mb-1.5 text-center">
+              Enter 6-digit verification code received by email
+            </label>
+
+            <div className="relative max-w-[260px] mx-auto">
               <input
                 type="text"
                 inputMode="numeric"
@@ -614,49 +594,22 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
                   setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
                   setErrorMessage('');
                 }}
-                onPaste={(e) => {
-                  e.preventDefault();
-                  const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-                  if (pastedData) {
-                    setOtpCode(pastedData);
-                    setErrorMessage('');
-                  }
-                }}
-                placeholder="000000"
-                className="w-full text-center text-3xl font-mono tracking-[0.5em] py-3.5 bg-white border-2 border-[#1a73e8] rounded-xl text-[#202124] focus:outline-none shadow-xs font-bold"
+                placeholder="······"
+                className="w-full text-center text-3xl font-mono tracking-[0.4em] py-3 bg-white border-2 border-[#1a73e8] rounded-xl text-[#202124] focus:outline-none shadow-xs font-bold"
               />
               {otpCode.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setOtpCode('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#5f6368] hover:text-[#202124] px-1.5 py-0.5 rounded bg-[#f1f3f4]"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#5f6368] hover:text-[#202124] px-1.5 py-0.5 rounded bg-[#f1f3f4]"
                 >
                   Clear
                 </button>
               )}
             </div>
 
-            {/* Individual digit preview pills */}
-            <div className="flex justify-center gap-2 mt-2">
-              {[0, 1, 2, 3, 4, 5].map((index) => {
-                const char = otpCode[index] || '';
-                return (
-                  <div
-                    key={index}
-                    className={`w-9 h-10 rounded-lg flex items-center justify-center font-mono text-lg font-bold border ${
-                      char
-                        ? 'border-[#1a73e8] bg-[#e8f0fe] text-[#1a73e8]'
-                        : 'border-[#dadce0] bg-[#f8f9fa] text-transparent'
-                    }`}
-                  >
-                    {char || '·'}
-                  </div>
-                );
-              })}
-            </div>
-
-            <p className="text-xs text-center text-[#5f6368] mt-2">
-              Code expires in 10 minutes. Check your email inbox carefully.
+            <p className="text-[11px] text-center text-[#5f6368] mt-2">
+              Code is valid for 10 minutes. Sent securely via email.
             </p>
           </div>
 
@@ -669,7 +622,7 @@ export function AuthModal({ initialMode = 'login', onSuccess }: AuthModalProps) 
           </button>
 
           <div className="flex items-center justify-between pt-1 text-xs text-[#5f6368]">
-            <span>Didn't get the code?</span>
+            <span>Didn't get the email?</span>
             {canResend ? (
               <button
                 type="button"

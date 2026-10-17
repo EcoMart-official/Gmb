@@ -7,6 +7,8 @@ import { DashboardNav, DashboardTab } from './components/dashboard/DashboardNav'
 import { OverviewTab } from './components/dashboard/OverviewTab';
 import { BusinessSettingsTab } from './components/dashboard/BusinessSettingsTab';
 import { ReviewLinkTab } from './components/dashboard/ReviewLinkTab';
+import { ReviewRepliesTab } from './components/dashboard/ReviewRepliesTab';
+import { DocsTab } from './components/dashboard/DocsTab';
 import { PublicReviewPage } from './components/public/PublicReviewPage';
 import { BusinessSettings, CustomerReview, GoogleBusinessAccount } from './types';
 import { api } from './lib/api';
@@ -24,6 +26,7 @@ import {
 function CustomerPortalContent() {
   const { user, token, isLoading, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings | null>(null);
   const [googleAccount, setGoogleAccount] = useState<GoogleBusinessAccount>({ connected: false });
@@ -147,7 +150,7 @@ function CustomerPortalContent() {
                 Google Business Profile Manager
               </div>
               <div className="text-[11px] font-medium text-[#5f6368]">
-                Review Automation & AI Replies by ReputePulse
+                Review Automation & AI Replies by RANKORA
               </div>
             </div>
           </div>
@@ -238,7 +241,7 @@ function CustomerPortalContent() {
 
         {/* Footer */}
         <footer className="max-w-7xl mx-auto w-full pt-6 text-center text-xs text-[#5f6368] border-t border-[#dadce0]">
-          Google Business Profile Review Automation &bull; ReputePulse &bull; Customer Portal
+          Google Business Profile Review Automation &bull; RANKORA &bull; Customer Portal
         </footer>
       </div>
     );
@@ -253,17 +256,28 @@ function CustomerPortalContent() {
           user={user}
           googleAccount={googleAccount}
           businessName={currentSettings.businessName}
+          businessLogo={currentSettings.businessLogo}
+          activeTab={activeTab}
+          onToggleSidebar={() => setSidebarOpen(true)}
           onLogout={logout}
           onNavigateToSettings={() => setActiveTab('business_settings')}
         />
 
         <DashboardNav
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
           activeTab={activeTab}
           onChangeTab={setActiveTab}
+          businessName={currentSettings.businessName}
+          businessLogo={currentSettings.businessLogo}
+          user={user}
+          googleAccount={googleAccount}
           pendingReviewsCount={pendingCount}
+          onLogout={logout}
+          onOpenPublicPage={() => setPreviewReviewPage(true)}
         />
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
           {activeTab === 'overview' && (
             <OverviewTab
               settings={currentSettings}
@@ -290,16 +304,24 @@ function CustomerPortalContent() {
               }}
             />
           )}
+
+          {activeTab === 'review_replies' && (
+            <ReviewRepliesTab
+              settings={currentSettings}
+              onUpdateSettings={(newSettings) => setBusinessSettings(newSettings)}
+            />
+          )}
+
+          {activeTab === 'docs' && (
+            <DocsTab />
+          )}
         </main>
       </div>
 
       <footer className="bg-white border-t border-[#dadce0] py-4 text-center text-xs text-[#5f6368]">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-center">
           <span>
             Google Business Profile Management &bull; Customer Data Isolation Active (RLS)
-          </span>
-          <span className="font-mono text-[11px] text-[#5f6368]">
-            Customer: {user.email}
           </span>
         </div>
       </footer>

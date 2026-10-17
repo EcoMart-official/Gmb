@@ -5,15 +5,16 @@ import dotenv from 'dotenv';
 import QRCode from 'qrcode';
 import { db, hashPassword, verifyPassword, createToken, verifyToken } from './server/db';
 import { sendOtpEmail } from './server/email';
-import { generateCustomerReviewDraft, generateBusinessReviewReply } from './server/gemini';
+import { generateCustomerReviewDraft, generateBusinessReviewReply, testGeminiApiKey } from './server/gemini';
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Security & Auth Middleware for Customer Panel
 interface AuthenticatedRequest extends Request {
@@ -43,10 +44,10 @@ function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunctio
 // Register Customer
 app.post('/api/auth/register', async (req: Request, res: Response) => {
   try {
-    const { fullName, email, mobileNumber, password, confirmPassword } = req.body;
+    const { fullName, businessName, email, mobileNumber, password, confirmPassword } = req.body;
 
-    if (!fullName || !email || !mobileNumber || !password) {
-      return res.status(400).json({ error: 'All fields are required.' });
+    if (!fullName || !businessName || !email || !mobileNumber || !password) {
+      return res.status(400).json({ error: 'All fields including Owner Name and Business Name are required.' });
     }
 
     if (password !== confirmPassword) {
@@ -77,13 +78,14 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
       verified: false,
       pendingUserData: {
         fullName,
+        businessName,
         mobileNumber,
         passwordHash: hashPassword(password),
       },
     });
 
     // Send OTP via Gmail SMTP
-    const emailResult = await sendOtpEmail({
+    await sendOtpEmail({
       toEmail: email,
       otpCode,
       purpose: 'registration',
@@ -93,12 +95,10 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
     return res.json({
       success: true,
       message: `A 6-digit verification code has been dispatched to ${email}.`,
-      simulated: emailResult.simulated,
-      debugOtp: emailResult.debugOtp,
     });
   } catch (error: any) {
     console.error('Registration error:', error);
-    return res.status(500).json({ error: 'Internal server error during registration.' });
+    return res.status(500).json({ error: error.message || 'Failed to dispatch verification email.' });
   }
 });
 
@@ -143,6 +143,7 @@ app.post('/api/auth/verify-otp', async (req: Request, res: Response) => {
       const user = db.createUser({
         email,
         fullName: record.pendingUserData.fullName,
+        businessName: record.pendingUserData.businessName,
         mobileNumber: record.pendingUserData.mobileNumber,
         passwordHash: record.pendingUserData.passwordHash,
         isVerified: true,
@@ -202,7 +203,7 @@ app.post('/api/auth/resend-otp', async (req: Request, res: Response) => {
       pendingUserData: record?.pendingUserData,
     });
 
-    const emailResult = await sendOtpEmail({
+    await sendOtpEmail({
       toEmail: email,
       otpCode,
       purpose,
@@ -212,12 +213,10 @@ app.post('/api/auth/resend-otp', async (req: Request, res: Response) => {
     return res.json({
       success: true,
       message: `A fresh 6-digit code has been dispatched to ${email}.`,
-      simulated: emailResult.simulated,
-      debugOtp: emailResult.debugOtp,
     });
   } catch (error: any) {
     console.error('Resend OTP error:', error);
-    return res.status(500).json({ error: 'Failed to resend code.' });
+    return res.status(500).json({ error: error.message || 'Failed to resend code.' });
   }
 });
 
@@ -272,8 +271,6 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
     }
 
     const user = db.findUserByEmail(email);
-    let debugOtp: string | undefined = undefined;
-    let simulated = false;
 
     if (user) {
       const otpCode = crypto.randomInt(100000, 999999).toString();
@@ -288,23 +285,18 @@ app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
         verified: false,
       });
 
-      const emailResult = await sendOtpEmail({
+      await sendOtpEmail({
         toEmail: email,
         otpCode,
         purpose: 'password_reset',
         customerName: user.fullName,
       });
-
-      debugOtp = emailResult.debugOtp;
-      simulated = emailResult.simulated;
     }
 
     // Generic confirmation response to prevent account enumeration
     return res.json({
       success: true,
       message: 'If an account is associated with this email address, a password reset code has been sent.',
-      simulated,
-      debugOtp,
     });
   } catch (error: any) {
     console.error('Forgot password error:', error);
@@ -391,11 +383,18 @@ app.post('/api/business/settings', requireAuth, (req: AuthenticatedRequest, res:
   try {
     const userId = req.user!.userId;
     const {
+      fullName,
+      mobileNumber,
       businessName,
+      businessLogo,
       category,
       placeId,
       googleReviewUrl,
       productsAndServices,
+      services,
+      shopAiDetails,
+      reviewWritingRules,
+      reviewStyleAndRules,
       customerExperience,
       brandTone,
       targetKeywords,
@@ -406,6 +405,19 @@ app.post('/api/business/settings', requireAuth, (req: AuthenticatedRequest, res:
       minStarRating,
       responseDelayMinutes,
     } = req.body;
+
+    // Validate 5MB limit for logo if uploaded
+    if (businessLogo && typeof businessLogo === 'string' && businessLogo.startsWith('data:image/')) {
+      if (businessLogo.length > 7.2 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Business logo file exceeds the 5MB size limit. Please upload an image under 5MB.' });
+      }
+    }
+
+    // Update owner profile info if provided (email is strictly non-editable)
+    let updatedUser;
+    if (fullName || mobileNumber) {
+      updatedUser = db.updateUserProfile(userId, { fullName, mobileNumber });
+    }
 
     // Validate custom slug uniqueness if changed
     if (customSlug) {
@@ -424,12 +436,18 @@ app.post('/api/business/settings', requireAuth, (req: AuthenticatedRequest, res:
       }
     }
 
+    const effectiveRules = reviewStyleAndRules !== undefined ? reviewStyleAndRules : reviewWritingRules;
+
     const updates: any = {
       businessName,
       category,
       placeId,
       googleReviewUrl,
       productsAndServices,
+      services,
+      shopAiDetails,
+      reviewWritingRules: effectiveRules,
+      reviewStyleAndRules: effectiveRules,
       customerExperience,
       brandTone,
       targetKeywords,
@@ -440,6 +458,10 @@ app.post('/api/business/settings', requireAuth, (req: AuthenticatedRequest, res:
       responseDelayMinutes: Number(responseDelayMinutes) || 5,
     };
 
+    if (businessLogo !== undefined) {
+      updates.businessLogo = businessLogo;
+    }
+
     if (customSlug && typeof customSlug === 'string' && customSlug.trim()) {
       updates.customSlug = customSlug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-');
     }
@@ -448,12 +470,92 @@ app.post('/api/business/settings', requireAuth, (req: AuthenticatedRequest, res:
 
     return res.json({
       success: true,
-      message: 'Business settings saved successfully.',
+      message: 'Business profile and settings saved successfully.',
       settings: updated,
+      user: updatedUser,
     });
   } catch (error: any) {
     console.error('Save business settings error:', error);
     return res.status(500).json({ error: 'Failed to update business settings.' });
+  }
+});
+
+// --------------------------------------------------------------------------
+// 2B. GEMINI AI API KEY CONFIGURATION & VERIFICATION
+// --------------------------------------------------------------------------
+
+app.get('/api/settings/gemini-key', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.userId;
+  const settings = db.getBusinessSettings(userId);
+  const activeKey = (settings.geminiApiKey || process.env.GEMINI_API_KEY || '').trim();
+
+  if (!activeKey) {
+    return res.json({
+      configured: false,
+      maskedKey: '',
+      key: '',
+    });
+  }
+
+  const maskedKey = activeKey.length > 8
+    ? activeKey.slice(0, 8) + '•'.repeat(Math.max(8, activeKey.length - 12)) + activeKey.slice(-4)
+    : '••••••••••••';
+
+  return res.json({
+    configured: true,
+    maskedKey,
+    key: activeKey,
+  });
+});
+
+app.post('/api/settings/gemini-key', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { apiKey } = req.body;
+
+    if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
+      return res.status(400).json({ error: 'Please enter a valid Gemini API key.' });
+    }
+
+    const trimmedKey = apiKey.trim();
+    // Update user business settings with this key
+    db.updateBusinessSettings(userId, { geminiApiKey: trimmedKey });
+    // Keep in-memory process.env synced as fallback
+    process.env.GEMINI_API_KEY = trimmedKey;
+
+    return res.json({
+      success: true,
+      message: 'Gemini API key saved and activated successfully.',
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to save Gemini API key.' });
+  }
+});
+
+app.post('/api/settings/gemini-key/test', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const settings = db.getBusinessSettings(userId);
+    const keyToTest = (req.body.apiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY || '').trim();
+
+    if (!keyToTest) {
+      return res.status(400).json({ error: 'No API key provided or configured to test.' });
+    }
+
+    const testResult = await testGeminiApiKey(keyToTest);
+    if (testResult.valid) {
+      return res.json({
+        success: true,
+        message: testResult.message,
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: testResult.message,
+      });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message || 'Failed to test Gemini API key.' });
   }
 });
 
@@ -641,6 +743,7 @@ app.get('/api/business/public/:slug', (req: Request, res: Response) => {
   // Return strictly public information (no private tokens or passwords)
   return res.json({
     businessName: business.businessName,
+    businessLogo: business.businessLogo,
     category: business.category,
     customSlug: business.customSlug,
     googleReviewUrl: business.googleReviewUrl || `https://search.google.com/local/writereview?placeid=${business.placeId}`,
@@ -669,7 +772,9 @@ app.post('/api/reviews/generate-draft', async (req: Request, res: Response) => {
     const draft = await generateCustomerReviewDraft({
       businessName,
       category,
-      productsAndServices: business?.productsAndServices,
+      productsAndServices: business?.productsAndServices || (business?.services && business.services.length > 0 ? business.services.join(', ') : undefined),
+      shopAiDetails: business?.shopAiDetails,
+      reviewWritingRules: business?.reviewWritingRules,
       customerExperience: business?.customerExperience,
       brandTone: business?.brandTone,
       starRating: Number(starRating) || 5,
@@ -696,13 +801,35 @@ app.get('/api/qr/code', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'URL query parameter is required.' });
     }
 
+    let requestedColor = (req.query.color as string) || '#1e3a8a';
+    if (!requestedColor.startsWith('#')) {
+      requestedColor = `#${requestedColor}`;
+    }
+    const validColor = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(requestedColor)
+      ? requestedColor
+      : '#1e3a8a';
+
+    // Calculate luminance to prevent invisible white-on-white QR codes
+    let cleanHex = validColor.replace('#', '');
+    if (cleanHex.length === 3) {
+      cleanHex = cleanHex.split('').map((c) => c + c).join('');
+    }
+    const r = parseInt(cleanHex.substring(0, 2), 16) / 255;
+    const g = parseInt(cleanHex.substring(2, 4), 16) / 255;
+    const b = parseInt(cleanHex.substring(4, 6), 16) / 255;
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+    // If modules are white or near-white (lum > 0.72), automatically set light background to deep slate (#0b1120)
+    // so the white QR code modules are ultra-sharp, high-contrast, perfectly visible and 100% scannable!
+    const lightBg = lum > 0.72 ? '#0b1120' : '#ffffff';
+
     const qrDataUrl = await QRCode.toDataURL(targetUrl, {
       errorCorrectionLevel: 'H',
       margin: 2,
-      width: 600,
+      width: 1024,
       color: {
-        dark: '#1e3a8a',
-        light: '#ffffff',
+        dark: validColor,
+        light: lightBg,
       },
     });
 
@@ -734,6 +861,8 @@ app.post('/api/reviews/generate-reply', requireAuth, async (req: AuthenticatedRe
       category: settings.category || 'Local Business',
       brandTone: tone || settings.brandTone || 'friendly',
       customerExperience: settings.customerExperience,
+      shopAiDetails: settings.shopAiDetails,
+      reviewWritingRules: settings.reviewWritingRules,
       authorName: authorName || 'Valued Customer',
       starRating: Number(starRating) || 5,
       reviewText: reviewText || '',

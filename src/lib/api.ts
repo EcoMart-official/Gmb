@@ -7,7 +7,7 @@ import {
 } from '../types';
 
 function getAuthHeader(): Record<string, string> {
-  const token = localStorage.getItem('reputepulse_token');
+  const token = localStorage.getItem('rankora_token') || localStorage.getItem('reputepulse_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -15,6 +15,7 @@ export const api = {
   // Auth
   async register(data: {
     fullName: string;
+    businessName: string;
     email: string;
     mobileNumber: string;
     password: string;
@@ -88,7 +89,9 @@ export const api = {
     return res.json();
   },
 
-  async updateBusinessSettings(settings: Partial<BusinessSettings>): Promise<{ success: boolean; settings: BusinessSettings; error?: string; message?: string }> {
+  async updateBusinessSettings(
+    settings: Partial<BusinessSettings> & { fullName?: string; mobileNumber?: string }
+  ): Promise<{ success: boolean; settings: BusinessSettings; user?: CustomerUser; error?: string; message?: string }> {
     const res = await fetch('/api/business/settings', {
       method: 'POST',
       headers: {
@@ -96,6 +99,38 @@ export const api = {
         ...getAuthHeader(),
       },
       body: JSON.stringify(settings),
+    });
+    return res.json();
+  },
+
+  // Gemini API Key Management
+  async getGeminiApiKey(): Promise<{ configured: boolean; maskedKey?: string; key?: string }> {
+    const res = await fetch('/api/settings/gemini-key', {
+      headers: { ...getAuthHeader() },
+    });
+    return res.json();
+  },
+
+  async saveGeminiApiKey(apiKey: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    const res = await fetch('/api/settings/gemini-key', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
+      },
+      body: JSON.stringify({ apiKey }),
+    });
+    return res.json();
+  },
+
+  async testGeminiApiKey(apiKey?: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    const res = await fetch('/api/settings/gemini-key/test', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
+      },
+      body: JSON.stringify({ apiKey }),
     });
     return res.json();
   },
@@ -187,8 +222,10 @@ export const api = {
   },
 
   // QR Code
-  async getQrCode(url: string): Promise<{ qrDataUrl: string }> {
-    const res = await fetch(`/api/qr/code?url=${encodeURIComponent(url)}`);
+  async getQrCode(url: string, color?: string): Promise<{ qrDataUrl: string }> {
+    const params = new URLSearchParams({ url });
+    if (color) params.append('color', color);
+    const res = await fetch(`/api/qr/code?${params.toString()}`);
     return res.json();
   },
 
